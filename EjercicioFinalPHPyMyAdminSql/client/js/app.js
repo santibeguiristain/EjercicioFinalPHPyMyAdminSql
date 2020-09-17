@@ -1,0 +1,270 @@
+ 
+class EventsManager {
+    constructor() {
+        this.obtenerDataInicial()
+    }
+
+
+    obtenerDataInicial() {
+        let url = '../server/getEvents.php'
+        $.ajax({
+          url: url,
+          dataType: "json",
+          cache: false,
+          processData: false,
+          contentType: false,
+          type: 'GET',
+          success: (data) =>{
+            if (data.msg=="OK") {// alert(data.result[0].title);
+              this.poblarCalendario(data.result);
+             
+            }else {
+              alert(data.msg)
+              window.location.href = 'index.html';
+            }
+          },
+          error: function(){
+            alert("error en la comunicación con el servidor");
+          }
+        })
+
+    }
+    
+ 
+  // FUNCIONANDO NO BORRARO *---------------------------------------------------*-*-
+     poblarCalendario(eventos) {
+         
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, { 
+      header: { 
+      left: 'prevYear,prev,next,nextYear today',
+        center: 'title',
+        right: 'dayGridMonth,dayGridWeek,dayGridDay'
+     }, 
+     initialDate: '2020-09-01',
+      navLinks: true,  
+      editable: true,
+      dayMaxEvents: true,  
+      droppable: true,
+      dragRevertDuration: 0,
+      //events: [{"title":"ders","start":"2020-08-15 15:00:00","end":"2020-08-15 16:00:00"},{"title":"pp","start":"2020-08-16 15:00:00","end":"2020-08-16 16:00:00"}]
+      events:eventos,
+      
+      eventDrop: (event) => {
+             this.obtEventoModif(event);
+             
+              
+             },
+      eventDragStart: (event,jsEvent) => {
+           $('.delete-btn').find('img').attr('src', "img/trash-open.png");
+           $('.delete-btn').css('background-color', '#a70f19')
+          },
+         
+      eventDragStop: (event,jsEvent) =>{
+           var trashEl = $('.delete-btn');
+           var ofs = trashEl.offset();
+           var x1 = ofs.left;
+           var x2 = ofs.left + trashEl.outerWidth(true);
+           var y1 = ofs.top;
+           var y2 = ofs.top + trashEl.outerHeight(true);
+           if (event.jsEvent.pageX >= x1 && event.jsEvent.pageX<= x2 && event.jsEvent.pageY >= y1 && event.jsEvent.pageY <= y2) {
+                this.eliminarEvento(event, jsEvent)
+                $('.calendario').fullCalendar('removeEvents',event.event._def.publicId);
+            }
+
+          }
+        });
+     calendar.render();
+    };
+
+
+
+    
+    
+
+      anadirEvento() {
+    
+      var form_data = new FormData();
+      form_data.append('titulo', $('#titulo').val())
+      form_data.append('start_date', $('#start_date').val())
+      form_data.append('allDay', document.getElementById('allDay').checked)
+      if (!document.getElementById('allDay').checked) {
+        form_data.append('end_date', $('#end_date').val())
+        form_data.append('end_hour', $('#end_hour').val())
+        form_data.append('start_hour', $('#start_hour').val())
+        
+      }else {
+        form_data.append('end_date', "")
+        form_data.append('end_hour', "")
+        form_data.append('start_hour', "")
+      }
+      $.ajax({
+        url: '../server/new_event.php',
+        dataType: "json",
+        cache: false,
+        processData: false,
+        contentType: false,
+        data: form_data,
+        type: 'POST',
+        success:(data) =>{
+          if (data.msg=="OK") {
+          // this.poblarCalendario(data.result);
+            if (document.getElementById('allDay').checked) {
+              $('.calendario').fullCalendar('renderEvent', {
+                title: $('#titulo').val(),
+                start: $('#start_date').val(),
+                allDay: true
+              })
+            }else {
+              $('.calendario').fullCalendar('renderEvent', {
+                title: $('#titulo').val(),
+                start: $('#start_date').val()+" "+$('#start_hour').val(),
+                allDay: false,
+                end: $('#end_date').val()+" "+$('#end_hour').val()
+              })
+            }
+           
+          }else{
+            alert(data.msg)
+          }
+        } 
+      }) 
+       setInterval('location.reload()', 100); 
+    }
+
+      eliminarEvento(event, jsEvent){
+       var form_data = new FormData()
+       form_data.append('id_evento', event.event._def.publicId)
+     
+      $.ajax({
+        url: '../server/delete_event.php',
+        dataType: "json",
+        cache: false,
+        processData: false,
+        contentType: false,
+        data: form_data,
+        type: 'POST',
+        success: (data) =>{
+          if (data.msg=="OK") {
+             
+          }else {
+            alert(data.msg)
+          }
+        } 
+      })
+       setInterval('location.reload()', 100); 
+      $('.delete-btn').find('img').attr('src', "img/trash.png");
+      $('.delete-btn').css('background-color', '#8B0913')
+    }
+
+
+      obtEventoModif(event) {
+         var form_data = new FormData()
+         form_data.append('id_evento', event.event._def.publicId)
+     
+         $.ajax({
+          url: '../server/getEvent_modif.php',
+          dataType: "json",
+          cache: false,
+          processData: false,
+          contentType: false,
+          data: form_data,
+          type: 'POST',
+          success: (data) =>{ 
+              //alert(data.result[0].start);
+              if (data.msg=="OK") {
+                
+                 this.actualizarEvento(
+                                        data.result[0].id,
+                                        data.result[0].start,
+                                        event.delta.days,
+                                        data.result[0].end
+                                                )  
+                                        
+            }else {
+              alert(data.msg);
+            }
+          },
+          error: function(){
+            alert("error en la comunicación con el servidor");
+          }
+        })
+    }
+ 
+ 
+    
+
+      actualizarEvento(id,start,diffDays,end) {
+          
+         var form_data = new FormData()     
+         form_data.append('id', id)
+         form_data.append('start_date', start.substr(0,10))
+         form_data.append('diff_days', diffDays)
+         form_data.append('end_date', end.substr(0,10))
+
+        $.ajax({
+          url: '../server/update_event.php',
+          dataType: "json",
+          cache: false,
+          processData: false,
+          contentType: false,
+          data: form_data,
+          type: 'POST',
+          success: (data) =>{
+            if (data.msg=="OK") {
+              alert('Se ha actualizado el evento exitosamente')
+            }else {
+              alert(data.msg)
+            }
+          } 
+        })
+    }
+};
+
+ 
+ window.onload = function() {
+  initForm();
+   var e = new EventsManager();
+  $('form').submit(function(event){
+    event.preventDefault()
+    e.anadirEvento()
+ 
+  })
+};
+ 
+
+
+
+
+
+function initForm(){
+    $('#start_date, #titulo, #end_date').val('');
+    $('#start_date, #end_date').datepicker({dateFormat: "yy-mm-dd"});
+ };
+    
+    $('.timepicker').timepicker({
+    timeFormat: 'HH:mm',
+    interval: '30',
+    minTime: '5',
+    maxTime: '23:30',
+    defaultTime: '7',
+    startTime: '5:00',
+    dynamic: false,
+    dropdown: true,
+    scrollbar: true
+  });
+  
+  $('#allDay').on('change', function(){
+    if (this.checked) {
+      $('.timepicker, #end_date').attr("disabled", "disabled")
+    }else {
+      $('.timepicker, #end_date').removeAttr("disabled")
+    }
+  });
+  
+ /* $(document).ready(function(){
+    $('.timepicker').timepicker({});
+});*/
+
+  
+
